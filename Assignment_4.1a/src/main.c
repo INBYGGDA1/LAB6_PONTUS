@@ -62,7 +62,7 @@ void producer(void *pvParameters) {
       UARTprintf("P: BUFFER FULL: SLEEPING\n");
       vTaskSuspend(NULL);
     }
-    UARTprintf("P: PLACING Byte in Buffer\n");
+    UARTprintf("P: PLACING Byte in Buffer: IDX[%d]\n",bufferIndex);
     // semaphore here
     byteCount[bufferIndex] = byte;
     bufferIndex++;
@@ -85,7 +85,7 @@ void consumer(void *pvParameters) {
       UARTprintf("C: Buffer empty, going to sleep\n");
       vTaskSuspend(NULL);
     }
-    UARTprintf("C: Removing byte from buffer\n");
+    UARTprintf("C: Removing byte from buffer: IDX[%d]\n",bufferIndex);
     // semaphore
     removeByteFromBuffer();
     if (bufferIndex == BUFFER_SIZE - 1) {
