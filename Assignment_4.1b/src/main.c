@@ -1,6 +1,8 @@
+/*================================================================*/
 #include <stdint.h>
 #include <stdbool.h>
 
+/*================================================================*/
 #include "driverlib/gpio.h"
 #include "driverlib/pin_map.h"
 #include "driverlib/sysctl.h"
@@ -8,17 +10,21 @@
 #include "driverlib/uart.h"
 #include "utils/uartstdio.h"
 
+/*================================================================*/
 #include "inc/hw_memmap.h"
 
+/*================================================================*/
 #include "FreeRTOS.h"
-#include "../inc/FreeRTOSConfig.h"
+#include "FreeRTOSConfig.h"
 #include "portmacro.h"
 #include "projdefs.h"
 #include "semphr.h"
 #include "task.h"
 
-#define BUFFER_SIZE 3
+/*================================================================*/
+#define BUFFER_SIZE 2
 
+/*================================================================*/
 volatile char byteCount[BUFFER_SIZE];
 volatile int bufferIndex = 0;
 SemaphoreHandle_t xSemaphoreCountingFULL, xSemaphoreCountingEmpty,
@@ -34,14 +40,21 @@ void __error__(char *pcFilename, uint32_t ui32Line) {
 }
 #endif
 
-char produceByte() {
+/*================================================================*/
+void produceByte() {
   char byte = 'c'; // Place 1 as the byte
-  return byte;
+  if (bufferIndex < BUFFER_SIZE) {
+    byteCount[bufferIndex] = byte;
+    bufferIndex++;
+  }
 }
 
+/*================================================================*/
 void removeByteFromBuffer() {
-  byteCount[bufferIndex] = '\0';
-  bufferIndex--;
+  if (bufferIndex > 0) {
+    byteCount[bufferIndex] = '\0';
+    bufferIndex--;
+  }
 }
 /*================================================================*/
 /*            Helper function configure uart                      */
@@ -57,65 +70,82 @@ void ConfigureUART() {
 }
 
 void producer(void *pvParameters) {
-  TaskHandle_t *xConsumerHandle = (TaskHandle_t *)pvParameters;
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xDelay = pdMS_TO_TICKS(200); // 200 ms delay
   while (1) {
 
-    char byte = produceByte();
-    // semphr
-    if (bufferIndex == BUFFER_SIZE) {
-      // semphr unlock
-      UARTprintf("P: BUFFER FULL: SLEEPING\n");
-      vTaskSuspend(NULL);
+    vTaskDelay(xDelay); // Delay for 200 ms
+
+    UARTprintf("+ PRODUCER --> TAKE SemEmpty: Empty-Count (%d)\n",
+               uxSemaphoreGetCount(xSemaphoreCountingEmpty));
+    // Take the empty semaphore as soon as there is an available slot, otherwise
+    // wait here
+    if (xSemaphoreTake(xSemaphoreCountingEmpty, (TickType_t)portMAX_DELAY) ==
+        pdTRUE) {
+
+      // CRITICAL SECTION
+      UARTprintf("+ PRODUCER --> TAKE BINARY, VALUE (%d)\n",
+                 uxSemaphoreGetCount(xSemaphoreBinary));
+      if (xSemaphoreTake(xSemaphoreBinary, (TickType_t)portMAX_DELAY) ==
+          pdFALSE) { // Take the binary semaphore to ensure mutual exclusion
+                     // when writing to the buffer.
+        UARTprintf("+ PRODUCER --> Error taking xSemaphoreBinary\n");
+      } else {
+
+        UARTprintf("+ PRODUCER --> Producing byte, Position (%d)\n",
+                   bufferIndex);
+        produceByte();
+        while (xSemaphoreGive(xSemaphoreBinary) != pdTRUE)
+          ;
+        // End CRITICAL SECTION
+
+        UARTprintf("+ PRODUCER --> GIVE BINARY, Updated VALUE (%d)\n",
+                   uxSemaphoreGetCount(xSemaphoreBinary));
+        while (xSemaphoreGive(xSemaphoreCountingFULL) != pdTRUE)
+          ; // Decrease available spots
+
+        UARTprintf("+ PRODUCER --> GIVE SemFull, Updated Full-Count (%d)\n",
+                   uxSemaphoreGetCount(xSemaphoreCountingFULL));
+      }
     }
-    UARTprintf("P: PLACING Byte in Buffer: IDX[%d]\n", bufferIndex);
-    // semaphore here
-    byteCount[bufferIndex] = byte;
-    bufferIndex++;
-    if (bufferIndex == 1) {
-      UARTprintf("P: BUFFER is not EMPTY, WAKING CONSUMER\n");
-      // Wake consumer
-      vTaskResume(*xConsumerHandle);
-    }
-    // semphr unlock
   }
 }
 void consumer(void *pvParameters) {
 
-  TaskHandle_t *xProducerHandle = (TaskHandle_t *)pvParameters;
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xDelay = pdMS_TO_TICKS(400); // 400 msecond delay
   while (1) {
 
-    if (xSemaphoreTake(xSemaphoreCountingEmpty, (TickType_t)1) ==
-        pdFAIL) { // If the buffer is empty, we cant consume, go to sleep, I.E.
-                  // the count is equal to 0
-      UARTprintf("C: Buffer empty, going to sleep\n");
-      vTaskSuspend(NULL);
-    } else {
-      UARTprintf("C: Taking xSemaphoreCountingEmpty\n");
-    }
+    vTaskDelay(xDelay);
 
-    if (xSemaphoreTake(xSemaphoreBinary, (TickType_t)portMAX_DELAY) ==
-        pdFAIL) { // Take the binary semaphore to ensure mutual exclusion when
-                  // writing to the buffer. We Cannot end up here if the buffer
-                  // is non empty
-      UARTprintf("C: Error taking xSemaphoreBinary\n");
-    } else {
-      UARTprintf("C: Taking Binary SEM\n");
-      UARTprintf("C: Removing byte from buffer: IDX[%d]\n", bufferIndex);
-      removeByteFromBuffer();
-      xSemaphoreGive(xSemaphoreCountingEmpty);
-      xSemaphoreGive(xSemaphoreBinary);
-    }
+    UARTprintf("- CONSUMER --> TAKE SemFull, Full-Count (%d)\n",
+               uxSemaphoreGetCount(xSemaphoreCountingFULL));
+    if (xSemaphoreTake(xSemaphoreCountingFULL, (TickType_t)portMAX_DELAY) ==
+        pdTRUE) { // If the xSemaphoreCountingFULL counter is > 0, we have bytes
+                  // to consume. Otherwise wait here until we have bytes to
+                  // consume
+      UARTprintf("- CONSUMER --> TAKE BINARY, VALUE (%d)\n",
+                 uxSemaphoreGetCount(xSemaphoreBinary));
+      if (xSemaphoreTake(xSemaphoreBinary, (TickType_t)portMAX_DELAY) ==
+          pdFALSE) { // Take the binary semaphore to ensure mutual exclusion
+                     // when writing to the buffer.
+        UARTprintf("- CONSUMER --> Error taking xSemaphoreBinary\n");
+      } else {
 
-    uxSemaphoreGetCount();
-    if (xSemaphoreTake(xSemaphoreCountingFULL, (TickType_t)1) ==
-        pdFAIL) { // If the count in the semaphore is equal to BUFFER_SIZE, the
-                  // buffer is full
+        // CRITICAL SECTION
+        UARTprintf("- CONSUMER --> Removing byte, Position (%d)\n",
+                   bufferIndex);
+        removeByteFromBuffer();
+        xSemaphoreGive(xSemaphoreBinary);
+        UARTprintf("- CONSUMER --> GIVE BINARY, Updated VALUE (%d)\n",
+                   uxSemaphoreGetCount(xSemaphoreBinary));
+        // END CRITICAL SECTION
 
-      // Wake producer
-      UARTprintf("C: Waking up producer\n");
-      vTaskResume(*xProducerHandle);
+        xSemaphoreGive(xSemaphoreCountingEmpty);
+        UARTprintf("- CONSUMER --> GIVE SemEmpty, Updated Empty-Count (%d)\n",
+                   uxSemaphoreGetCount(xSemaphoreCountingEmpty));
+      }
     }
-    // semaphore unlock
   }
 }
 
@@ -126,26 +156,30 @@ int main(void) {
   ConfigureUART();
   UARTprintf("\033[2J");
 
-  xProducerReturn = xTaskCreate(producer, "producer", 128,
-                                (void *)&xConsumerHandle, 1, &xProducerHandle);
-  xConsumerReturn = xTaskCreate(consumer, "consumer", 128,
-                                (void *)&xProducerHandle, 1, &xConsumerHandle);
+  xProducerReturn =
+      xTaskCreate(producer, "producer", 128, NULL, 1, &xProducerHandle);
+  xConsumerReturn =
+      xTaskCreate(consumer, "consumer", 128, NULL, 1, &xConsumerHandle);
   if (xProducerReturn == pdPASS && xConsumerReturn == pdPASS) {
     UARTprintf("Producer & Consumer Tasks created\n");
   }
   xSemaphoreCountingFULL = xSemaphoreCreateCounting(
       BUFFER_SIZE,
       0); // Increase this semaphore whenever producer produces a byte. The
-          // Buffer is full if xSemaphoreCountingFULL is equal to BUFFER_SIZE
+          // Buffer is full if xSemaphoreCountingFULL is equal to BUFFER_SIZE.
+          // By xSemaphoreGive we increase the counter since we start at 0.
   xSemaphoreCountingEmpty = xSemaphoreCreateCounting(
       BUFFER_SIZE,
-      BUFFER_SIZE); // Whenever this semaphore is equal to the buffer size, the
-                    // BUFFER_SIZE is empty
+      BUFFER_SIZE); // Whenever this semaphore is equal to the buffer size,
+                    // the BUFFER_SIZE is empty. By xSemaphoreTake we decrease
+                    // the semaphore counter since we start at BUFFER_SIZE
+                    // available slots.
   xSemaphoreBinary = xSemaphoreCreateBinary();
   if (xSemaphoreCountingEmpty == NULL || xSemaphoreCountingFULL == NULL ||
       xSemaphoreBinary == NULL) {
     UARTprintf("Unable to create semaphores\n");
   }
+  xSemaphoreGive(xSemaphoreBinary);
 
   vTaskStartScheduler();
 }
