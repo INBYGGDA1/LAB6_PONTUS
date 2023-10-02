@@ -9,7 +9,7 @@
 #include "FreeRTOS.h"
 #include "portmacro.h"
 #include "projdefs.h"
-#include <../inc/FreeRTOSConfig.h>
+#include "FreeRTOSConfig.h"
 #include "semphr.h"
 #include "task.h"
 #include "utils/uartstdio.h"
@@ -62,7 +62,7 @@ void producer(void *pvParameters) {
       UARTprintf("P: BUFFER FULL: SLEEPING\n");
       vTaskSuspend(NULL);
     }
-    UARTprintf("P: PLACING Byte in Buffer: IDX[%d]\n",bufferIndex);
+    UARTprintf("P: PLACING Byte in Buffer: IDX[%d]\n", bufferIndex);
     // semaphore here
     byteCount[bufferIndex] = byte;
     bufferIndex++;
@@ -85,7 +85,7 @@ void consumer(void *pvParameters) {
       UARTprintf("C: Buffer empty, going to sleep\n");
       vTaskSuspend(NULL);
     }
-    UARTprintf("C: Removing byte from buffer: IDX[%d]\n",bufferIndex);
+    UARTprintf("C: Removing byte from buffer: IDX[%d]\n", bufferIndex);
     // semaphore
     removeByteFromBuffer();
     if (bufferIndex == BUFFER_SIZE - 1) {
