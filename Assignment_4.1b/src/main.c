@@ -1,3 +1,17 @@
+/*
+ * ================================================================
+ * File: main.c
+ * Author: Pontus Svensson, Carl Larsson
+ * Email: psn19003@student.mdu.se, cln20001@student.mdu.se
+ * Date: 2023-10-03
+ * Description: Solution to the producer, consumer problem using counting
+ * semaphores and binary semaphores.
+ *
+ * License: This code is distributed under the MIT License. visit
+ * https://opensource.org/licenses/MIT for more information.
+ * ================================================================
+ */
+
 /*================================================================*/
 #include <stdint.h>
 #include <stdbool.h>
@@ -136,12 +150,14 @@ void consumer(void *pvParameters) {
         UARTprintf("- CONSUMER --> Removing byte, Position (%d)\n",
                    bufferIndex);
         removeByteFromBuffer();
-        xSemaphoreGive(xSemaphoreBinary);
+        while (xSemaphoreGive(xSemaphoreBinary) != pdTRUE)
+          ;
         UARTprintf("- CONSUMER --> GIVE BINARY, Updated VALUE (%d)\n",
                    uxSemaphoreGetCount(xSemaphoreBinary));
         // END CRITICAL SECTION
 
-        xSemaphoreGive(xSemaphoreCountingEmpty);
+        while (xSemaphoreGive(xSemaphoreCountingEmpty) != pdTRUE)
+          ;
         UARTprintf("- CONSUMER --> GIVE SemEmpty, Updated Empty-Count (%d)\n",
                    uxSemaphoreGetCount(xSemaphoreCountingEmpty));
       }
