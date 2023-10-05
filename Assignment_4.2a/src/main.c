@@ -21,6 +21,7 @@
 /*================================================================*/
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 /*================================================================*/
 #include "driverlib/gpio.h"
@@ -43,7 +44,7 @@
 #include "queue.h"
 
 #define uxQueueLength 10
-#define STRING_LENGTH 15
+#define STRING_LENGTH 16
 struct xUartVariable {
   char toPrint;
 };
@@ -68,48 +69,59 @@ void ConfigureUART() {
   UARTStdioConfig(0, 115200, 16000000);
 }
 void uartPrinter(void *pvParameters) {
-  QueueHandle_t xQueue1 = *(QueueHandle_t *)pvParameters;
-  char *msgBuffer;
-  char charHolder;
-  char strToPrint[STRING_LENGTH];
-  int charCounter = 0, strShift = 0;
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xDelay = pdMS_TO_TICKS(20); // 200 ms delay
+  char input[128];
+  char strHolder[128];
+  char strToPrint[STRING_LENGTH] = {0};
+  int bytesRead;
+  int i;
+  int total_number_of_bytes = 0, current_str_length = 0;
+  int strShift = 0;
+
   for (;;) {
-    vTaskDelay(xDelay); // Delay for 200 ms
-    if (xQueueReceive(xQueue1, msgBuffer, (TickType_t)5) != pdFALSE) {
-      // UARTprintf("Error receiving msg from queue\n");
-      for (charCounter = 0; charCounter < STRING_LENGTH - 1; charCounter++) {
-        if (strToPrint[charCounter] == '\0' &&
-            charCounter == 0) { // If the string is empty
-          strToPrint[charCounter] =
-              *msgBuffer; // Set the first index in the string to input
-          strToPrint[charCounter++] = '\0'; // Null terminate the string
-          break;
-        } else if (strToPrint[charCounter] == '\0' &&
-                   charCounter <
-                       STRING_LENGTH - 1) { // If null termination was reached
-                                            // before STRING_LENGTH we add
-          strToPrint[charCounter] = *msgBuffer;
-          strToPrint[charCounter++] = '\0'; // Null terminate the string
-          break;
-        }
-        if (charCounter ==
-            STRING_LENGTH - 1) { // We need to shift the string to the left and
-                                 // place the char at the end
-          while (strShift < STRING_LENGTH - 1) {
-            strToPrint[strShift] = strToPrint[strShift + 1];
-            strShift++;
-          }
-          strToPrint[strShift] = *msgBuffer;
-          strToPrint[strShift++] = '\0';
-        }
-      }
-      strShift = 0;
-      UARTprintf("%s\n", strToPrint);
+    UARTprintf("Input: ");
+    bytesRead = UARTgets(input, sizeof(input)); // bytesRead does not include \0
+    for (i = 0; i < 128; i++) {
+      strHolder[i] = 0;
     }
+    total_number_of_bytes = bytesRead + strlen(strToPrint); // excluding \0
+    strShift = total_number_of_bytes - STRING_LENGTH;
+    for (i = 0; i < strlen(strToPrint); i++) {
+      strHolder[i] = strToPrint[i];
+    }
+    strHolder[i] = '\0';
+    current_str_length = strlen(strHolder);
+    for (i = 0; i < bytesRead; i++) {
+      strHolder[current_str_length] = input[i];
+      current_str_length++;
+    }
+    strHolder[current_str_length + i] = '\0';
+
+    if (total_number_of_bytes >= STRING_LENGTH) {
+
+      while (strShift >= 0) {
+
+        for (i = 0; i < strlen(strHolder);
+             i++) { // Shift all characters to the left
+          strHolder[i] = strHolder[i + 1];
+        }
+        strHolder[i] = '\0';
+        strShift--;
+      }
+      for (i = 0; i < strlen(strHolder); i++) {
+        strToPrint[i] = strHolder[i];
+      }
+      strToPrint[i] = '\0';
+    } else {
+      for (i = 0; i < strlen(strHolder); i++) {
+        strToPrint[i] = strHolder[i];
+      }
+      strToPrint[i] = '\0';
+
+    }
+    UARTprintf("%s\n", strToPrint);
   }
 }
+
 void uartInput(void *pvParameters) {
   QueueHandle_t xQueue1 = *(QueueHandle_t *)pvParameters;
   char inputBuffer[STRING_LENGTH];
@@ -117,14 +129,14 @@ void uartInput(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xDelay = pdMS_TO_TICKS(10); // 200 ms delay
   for (;;) {
-    vTaskDelay(xDelay); // Delay for 200 ms
+    // vTaskDelayUntil(&xLastWakeTime, xDelay); // Delay for 200 ms
     // Maybe some check to if user inputs more letters than 1
     UARTprintf("Input: ");
     UARTgets(inputBuffer, sizeof(inputBuffer));
     UARTprintf("ECHO: %s\n", inputBuffer);
     while (*pinputBuffer) {
-      if (xQueueSend(xQueue1, (char *)*pinputBuffer,
-                     (TickType_t)portMAX_DELAY) != pdPASS) {
+      if (xQueueSend(xQueue1, pinputBuffer, (TickType_t)portMAX_DELAY) !=
+          pdPASS) {
         UARTprintf("Failed sending to queue\n");
       } // Send one character at a time to the queue
       pinputBuffer++;
@@ -132,24 +144,28 @@ void uartInput(void *pvParameters) {
   }
 }
 int main(void) {
-  QueueHandle_t xQueue1;
+  // QueueHandle_t xQueue1 = NULL;
   TaskHandle_t xUartPrinterHandle, xUartInputHandle;
   BaseType_t xUartPrinterReturn, xUartInputReturn;
+  // char buffer[STRING_LENGTH];
   ConfigureUART();
   UARTprintf("\033[2J");
-  xQueue1 = xQueueCreate(((UBaseType_t)uxQueueLength), sizeof(char));
-  if (xQueue1 != NULL) {
-    UARTprintf("Queue successfully created\n");
-  }
+  // xQueue1 = xQueueCreate(10, sizeof(char));
+  // if (xQueue1 != NULL) {
+  //   UARTprintf("Queue successfully created\n");
+  // }
   xUartPrinterReturn = xTaskCreate(uartPrinter, "Print serial", 128, NULL, 1,
                                    &xUartPrinterHandle);
-  xUartInputReturn =
-      xTaskCreate(uartInput, "Input serial", 128, NULL, 1, &xUartInputHandle);
+  // xUartInputReturn =
+  //     xTaskCreate(uartInput, "Input serial", 256, NULL, 1,
+  //     &xUartInputHandle);
   if (xUartPrinterReturn != pdFALSE) {
     UARTprintf("UARTPrinter task successfully started\n");
   }
-  if (xUartInputReturn != pdFALSE) {
-    UARTprintf("UARTInput task successfully started\n");
-  }
+  // if (xUartInputReturn != pdFALSE) {
+  //   UARTprintf("UARTInput task successfully started\n");
+  // }
+  // UARTgets(buffer, sizeof(buffer));
+  // UARTprintf("ECHO: %s\n", buffer);
   vTaskStartScheduler();
 }
