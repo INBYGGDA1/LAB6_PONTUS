@@ -43,15 +43,18 @@
 #include "projdefs.h"
 #include "semphr.h"
 #include "task.h"
+#include "timers.h"
 #include "queue.h"
+#include "portable.h"
 
 #define STRING_LENGTH 16
 volatile int display_bytes_read = 0;
 struct xParam {
   char str_to_print[STRING_LENGTH];
   int total_number_of_bytes_read;
-  QueueHandle_t message_queue;
 };
+QueueHandle_t message_queue;
+
 /*================================================================*/
 #ifdef DEBUG
 void __error__(char *pcFilename, uint32_t ui32Line) {
@@ -73,28 +76,35 @@ void ConfigureUART() {
   UARTStdioConfig(0, 115200, 16000000);
 }
 void uartPrinter(void *pvParameters) {
-  struct xParam param = *(struct xParam *)pvParameters;
-  char input[128];
-  char strHolder[128];
-  int bytesRead, i;
+  struct xParam *param = pvPortMalloc(sizeof(struct xParam));
+  char input[128] = {0};
+  char strHolder[128] = {0};
+  int bytesRead = 0, i = 0;
   int total_number_of_bytes = 0, current_str_length = 0, strShift = 0;
+  const TickType_t xDelayPeriod = pdMS_TO_TICKS(1);
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  for (i = 0; i < STRING_LENGTH; i++) {
+    param->str_to_print[i] = 0;
+  }
+  param->total_number_of_bytes_read = 0;
 
   for (;;) {
-    UARTprintf("Input: ");
-    bytesRead = UARTgets(input, sizeof(*input)); // bytesRead does not include \0
-    for (i = 0; i < 128; i++) {                 // Reset the array
+    // vTaskDelayUntil(&xLastWakeTime, xDelayPeriod);
+    // UARTprintf("Input: ");
+    bytesRead = UARTgets(input, sizeof(input)); // bytesRead does not include \0
+    // UARTprintf("ECHO: %s\n", input);
+    for (i = 0; i < 128; i++) { // Reset the array
       strHolder[i] = 0;
     }
-
     total_number_of_bytes =
-        bytesRead + strlen(param.str_to_print);    // excluding \0
-    param.total_number_of_bytes_read += bytesRead; // Update the bytes read
+        bytesRead + strlen(param->str_to_print);    // excluding \0
+    param->total_number_of_bytes_read += bytesRead; // Update the bytes read
     strShift =
         total_number_of_bytes -
         STRING_LENGTH; // If the value is positive we need to shift the string
-    for (i = 0; i < strlen(param.str_to_print);
+    for (i = 0; i < strlen(param->str_to_print);
          i++) { // Copy previous string to a temp array
-      strHolder[i] = param.str_to_print[i];
+      strHolder[i] = param->str_to_print[i];
     }
     strHolder[i] = '\0';
     current_str_length =
@@ -119,18 +129,20 @@ void uartPrinter(void *pvParameters) {
         strShift--;
       }
       for (i = 0; i < strlen(strHolder); i++) { // Copy to the str to be printed
-        param.str_to_print[i] = strHolder[i];
+        param->str_to_print[i] = strHolder[i];
       }
-      param.str_to_print[i] = '\0';
+      param->str_to_print[i] = '\0';
     } else {
       for (i = 0; i < strlen(strHolder); i++) {
-        param.str_to_print[i] = strHolder[i];
+        param->str_to_print[i] = strHolder[i];
       }
-      param.str_to_print[i] = '\0';
+      param->str_to_print[i] = '\0';
     }
-    xQueueSend(param.message_queue, (const void *)&param,
-               (TickType_t)portMAX_DELAY);
+    if (xQueueSend(message_queue, param, (TickType_t)portMAX_DELAY) != pdPASS) {
+      UARTprintf("Unable to send message to queue\n");
+    }
   }
+  vPortFree(param);
 }
 
 void ConfigureBUTTON() {
@@ -142,9 +154,12 @@ void buttonPoller(void *pvParameters) {
   // struct xParam param = *(struct xParam *)pvParameters;
   unsigned char ucDelta, ucState;
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xDelay = pdMS_TO_TICKS(10000); // 200 ms delay
+  const TickType_t xDelay = pdMS_TO_TICKS(10000);   // 10s delay
+  const TickType_t xDelayPeriod = pdMS_TO_TICKS(2); // 200 ms delay
   for (;;) {
 
+    // vTaskDelayUntil(&xLastWakeTime, xDelayPeriod);
+    // UARTprintf("Polling\n");
     ucState = ButtonsPoll(&ucDelta, 0);
 
     if (BUTTON_PRESSED(LEFT_BUTTON, ucState, ucDelta)) {
@@ -160,41 +175,51 @@ void buttonPoller(void *pvParameters) {
 }
 
 void gatekeeper(void *pvParameters) {
-  struct xParam param = *(struct xParam *)pvParameters;
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xDelay = pdMS_TO_TICKS(4); // 200 ms delay
+  int i, total_number_of_bytes = 0;
+  struct xParam *param = pvPortMalloc(sizeof(struct xParam));
+  char strToPrint[STRING_LENGTH];
+
   for (;;) {
-    xQueueReceive(param.message_queue, &param, (TickType_t)1);
+    // vTaskDelayUntil(&xLastWakeTime, xDelay);
+    // UARTprintf("gatekeeping\n");
+    if (xQueueReceive(message_queue, param, (TickType_t)0) == pdPASS) {
+      // UARTprintf("Unable to retrieve message from queue\n");
+      for (i = 0; i < STRING_LENGTH; i++) {
+        strToPrint[i] = param->str_to_print[i];
+      }
+      total_number_of_bytes = param->total_number_of_bytes_read;
+    }
     if (display_bytes_read == 1) {
       UARTprintf("\033[2J");
-      UARTprintf("%s\n", param.str_to_print);
-      UARTprintf("%d\n", param.total_number_of_bytes_read);
+      UARTprintf("%s\n", strToPrint);
+      UARTprintf("%d\n", total_number_of_bytes);
     } else {
       UARTprintf("\033[2J");
-      UARTprintf("%s\n", param.str_to_print);
+      UARTprintf("%s\n", strToPrint);
     }
   }
+  vPortFree(param);
 }
 int main(void) {
-  QueueHandle_t xQueue1 = NULL;
   TaskHandle_t xUartPrinterHandle, xGatekeeper, xButtonPoll;
   BaseType_t xUartPrinterReturn, xbGatekeeper, xbButtonPoll;
-  struct xParam param;
-
-  param.message_queue = xQueue1;
-  param.total_number_of_bytes_read = 0;
 
   ConfigureUART();
   ConfigureBUTTON();
   UARTprintf("\033[2J");
-  xQueue1 = xQueueCreate(10, sizeof(struct xParam));
-  if (xQueue1 != NULL) {
+  message_queue = xQueueCreate(10, sizeof(struct xParam));
+  if (message_queue != NULL) {
     UARTprintf("Queue successfully created\n");
   }
-  xUartPrinterReturn = xTaskCreate(uartPrinter, "Print serial", 128,
-                                   (void *)&param, 1, &xUartPrinterHandle);
-  xbGatekeeper = xTaskCreate(gatekeeper, "gatekeeper", 128, (void *)&param, 1,
-                             &xGatekeeper);
+
+  xUartPrinterReturn = xTaskCreate(uartPrinter, "Print serial", 256, NULL, 3,
+                                   &xUartPrinterHandle);
+  xbGatekeeper =
+      xTaskCreate(gatekeeper, "gatekeeper", 256, NULL, 3, &xGatekeeper);
   xbButtonPoll =
-      xTaskCreate(buttonPoller, "ButtonPoll", 128, NULL, 1, &xButtonPoll);
+      xTaskCreate(buttonPoller, "ButtonPoll", 256, NULL, 3, &xButtonPoll);
   if (xbButtonPoll != pdFALSE) {
     UARTprintf("xButtonPoll task successfully started\n");
   }
@@ -204,5 +229,6 @@ int main(void) {
   if (xbGatekeeper != pdFALSE) {
     UARTprintf("Gatekeeper task successfully started\n");
   }
+
   vTaskStartScheduler();
 }
