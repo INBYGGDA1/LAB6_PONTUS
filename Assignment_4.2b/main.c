@@ -151,15 +151,11 @@ void ConfigureBUTTON() {
   GPIOPinTypeGPIOOutput(CLP_D1_PORT, CLP_D1_PIN);
 }
 void buttonPoller(void *pvParameters) {
-  // struct xParam param = *(struct xParam *)pvParameters;
   unsigned char ucDelta, ucState;
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xDelay = pdMS_TO_TICKS(10000);   // 10s delay
-  const TickType_t xDelayPeriod = pdMS_TO_TICKS(2); // 200 ms delay
+  const TickType_t xDelay = pdMS_TO_TICKS(10000); // 10s delay
   for (;;) {
 
-    // vTaskDelayUntil(&xLastWakeTime, xDelayPeriod);
-    // UARTprintf("Polling\n");
     ucState = ButtonsPoll(&ucDelta, 0);
 
     if (BUTTON_PRESSED(LEFT_BUTTON, ucState, ucDelta)) {
@@ -167,7 +163,8 @@ void buttonPoller(void *pvParameters) {
       display_bytes_read = 1;
       LEDWrite(CLP_D1, CLP_D1);
 
-      vTaskDelayUntil(&xLastWakeTime, xDelay);
+      // vTaskDelayUntil(&xLastWakeTime, xDelay);
+      vTaskDelay(xDelay);
       LEDWrite(CLP_D1, 0);
       display_bytes_read = 0;
     }
@@ -176,28 +173,37 @@ void buttonPoller(void *pvParameters) {
 
 void gatekeeper(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xDelay = pdMS_TO_TICKS(4); // 200 ms delay
   int i, total_number_of_bytes = 0;
   struct xParam *param = pvPortMalloc(sizeof(struct xParam));
   char strToPrint[STRING_LENGTH];
+  int buttonTracker = 0, printTracker = 0;
 
   for (;;) {
-    // vTaskDelayUntil(&xLastWakeTime, xDelay);
-    // UARTprintf("gatekeeping\n");
     if (xQueueReceive(message_queue, param, (TickType_t)0) == pdPASS) {
-      // UARTprintf("Unable to retrieve message from queue\n");
       for (i = 0; i < STRING_LENGTH; i++) {
         strToPrint[i] = param->str_to_print[i];
       }
       total_number_of_bytes = param->total_number_of_bytes_read;
-    }
-    if (display_bytes_read == 1) {
+      buttonTracker = 0;
+      printTracker = 0;
+      if (display_bytes_read == 1) {
+        UARTprintf("\033[2J");
+        UARTprintf("%s\n", strToPrint);
+        UARTprintf("%d\n", total_number_of_bytes);
+      } else {
+        UARTprintf("\033[2J");
+        UARTprintf("%s\n", strToPrint);
+      }
+    } else if (buttonTracker != 1 && display_bytes_read == 1) {
       UARTprintf("\033[2J");
       UARTprintf("%s\n", strToPrint);
       UARTprintf("%d\n", total_number_of_bytes);
-    } else {
+      buttonTracker = 1;
+    } else if (printTracker != 1 && display_bytes_read == 0) {
+
       UARTprintf("\033[2J");
       UARTprintf("%s\n", strToPrint);
+      printTracker = 1;
     }
   }
   vPortFree(param);
