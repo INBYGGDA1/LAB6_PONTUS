@@ -103,7 +103,8 @@ void ADC_newSequence(uint32_t ui32base, uint32_t ui32SequenceNum,
   // Set the trigger for the sampling sequence to be manual
   ADCSequenceConfigure(ui32base, ui32SequenceNum, ADC_TRIGGER_PROCESSOR, 0);
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // Configure each step in the sampling process.
+  // Configure each step in the sampling process. Here we could add set another
+  // channel to sample from in another step.
   for (i = 0; i < ui32Samples; i++) {
     ADCSequenceStepConfigure(ui32base, ui32SequenceNum, i, ui32ADC_Channel);
   }
@@ -117,6 +118,8 @@ void ADC_newSequence(uint32_t ui32base, uint32_t ui32SequenceNum,
   ADCSequenceEnable(ui32base, ui32SequenceNum);
 }
 
+//=============================================================================
+// Helper function to sample the data
 //=============================================================================
 void sampleData(uint32_t ui32base, uint32_t ui32SequenceNum,
                 uint32_t ui32ADC_Channel, uint32_t ui32Samples,
