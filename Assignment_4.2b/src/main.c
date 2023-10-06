@@ -174,7 +174,7 @@ static void timer_callback(TimerHandle_t xTimer) {
 /*================================================================*/
 void buttonPoller(void *pvParameters) {          // Task to poll the button
   unsigned char ucDelta, ucState;                // Button changed flag
-  const TickType_t xDelay = pdMS_TO_TICKS(1000); // 10s delay
+  const TickType_t xDelay = pdMS_TO_TICKS(1400); // 10s delay
   TimerHandle_t timer_handle =
       xTimerCreate("timer", xDelay, pdFALSE, NULL,
                    timer_callback); // Create a 10s timer for the button timeout
@@ -192,8 +192,8 @@ void buttonPoller(void *pvParameters) {          // Task to poll the button
 }
 
 /*================================================================*/
-void gatekeeper(void *pvParameters) { // Function to continuosly print
-  int i, total_number_of_bytes = 0, buttonTracker = -1;
+void gatekeeper(void *pvParameters) { // Function to continuously print
+  int buttonTracker = -1;
   struct xParam *param = pvPortMalloc(sizeof(struct xParam));
 
   for (;;) {
