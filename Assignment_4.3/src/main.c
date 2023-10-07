@@ -248,12 +248,7 @@ int main(void) {
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ConfigureUART();
   UARTprintf("\033[2J");
-  ADC_init(SYSCTL_PERIPH_ADC0);
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // Enable GPIO_PORTE Since this is where the
-  // BoosterPack EDUMKII, joystick, accelerometer & microphone connects to.
-  // See the table below.
-  GPIOPort_init(SYSCTL_PERIPH_GPIOE);
+  PERIPH_init(SYSCTL_PERIPH_ADC0);
   SENSOR_enable(MICROPHONE | JOYSTICK | ACCELEROMETER);
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   mic_queue = xQueueCreate(QUEUE_SIZE, sizeof(struct microphone_values));
