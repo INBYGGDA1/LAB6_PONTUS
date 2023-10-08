@@ -1,3 +1,16 @@
+/*
+ * ================================================================
+ * File: main.c
+ * Author: Pontus Svensson
+ * Email: psn19003@student.mdu.se
+ * Date: 2023-09-24
+ * Description:
+ *
+ * License: This code is distributed under the MIT License. visit
+ * https://opensource.org/licenses/MIT for more information.
+ * ================================================================
+ */
+
 //=============================================================================
 #include <math.h>
 #include <stdint.h>
