@@ -4,7 +4,13 @@
  * Author: Pontus Svensson
  * Email: psn19003@student.mdu.se
  * Date: 2023-09-24
- * Description:
+ * Description: The program creates sampling sequences for the peripherals
+ * MICROPHONE,JOYSTICK, ACCELEROMETER on the MKII BoosterPack. The Microphone
+ * ADC sequence takes 8 samples on sequence # 0. Joystick and Accelerometer
+ * takes 4 and 2 samples per axis respectively. Each of the peripherals samples
+ * are stored in a buffer which is sent to a gatekeeper task which calculates
+ * the average and prints the value. The messages are sent using a message
+ * queues. Each peripheral has its own message queue to the gatekeeper.
  *
  * License: This code is distributed under the MIT License. visit
  * https://opensource.org/licenses/MIT for more information.
@@ -245,9 +251,7 @@ int main(void) {
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // There exist some errata with using the main oscillator and adc, hence the
   // internal oscillator is specified instead
-  systemClock = SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ | SYSCTL_OSC_INT |
-                                    SYSCTL_USE_PLL | SYSCTL_CFG_VCO_480),
-                                   120000000);
+  ConfigureSystemClock(120000000, &systemClock);
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   TaskHandle_t xTaskMicHandle;
   TaskHandle_t xTaskAccHandle;
@@ -260,7 +264,7 @@ int main(void) {
   BaseType_t xGatekeerperHandleReturn;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ConfigureUART();
-  UARTprintf("\033[2J");
+  UARTClearScreen();
   PERIPH_init(SYSCTL_PERIPH_ADC0);
   SENSOR_enable(MICROPHONE | JOYSTICK | ACCELEROMETER);
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
