@@ -42,7 +42,7 @@
 #include "portable.h"
 
 //=============================================================================
-#define WAIT_TIME 5
+#define TIME_CONSTANT 5
 #define MIC_SAMPLES 8
 #define JOY_SAMPLES 4
 #define ACC_SAMPLES 2
@@ -81,7 +81,7 @@ void task_mic(void *pvParameters) {
   struct microphone_values mic_val;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // Create a periodic delay
-  const TickType_t xDelay = pdMS_TO_TICKS(WAIT_TIME * T);
+  const TickType_t xDelay = pdMS_TO_TICKS(TIME_CONSTANT * T);
   TickType_t xLasWakeTime = xTaskGetTickCount();
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // Since the microphone is the only task using the "0" sequence it only has to
@@ -105,13 +105,13 @@ void task_mic(void *pvParameters) {
 //=============================================================================
 void task_joy(void *pvParameters) {
   const int T = 2;
+  uint32_t i = 0;
   uint32_t samplesReturned = 0;
-  int i = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   struct joystick_values joy;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // Create a periodic delay
-  const TickType_t xDelay = pdMS_TO_TICKS(WAIT_TIME * T);
+  const TickType_t xDelay = pdMS_TO_TICKS(TIME_CONSTANT * T);
   TickType_t xLasWakeTime = xTaskGetTickCount();
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   for (;;) {
@@ -145,7 +145,7 @@ void task_acc(void *pvParameters) {
   struct accelerometer_values acc;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // Create a periodic delay
-  const TickType_t xDelay = pdMS_TO_TICKS(WAIT_TIME * T);
+  const TickType_t xDelay = pdMS_TO_TICKS(TIME_CONSTANT * T);
   TickType_t xLasWakeTime = xTaskGetTickCount();
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   for (;;) {
@@ -201,7 +201,7 @@ void xGatekeeper(void *pvParameters) {
   struct accelerometer_values acc;
   struct microphone_values mic_val;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  const TickType_t xDelay = pdMS_TO_TICKS(WAIT_TIME * T);
+  const TickType_t xDelay = pdMS_TO_TICKS(TIME_CONSTANT * T);
   TickType_t xLasWakeTime = xTaskGetTickCount();
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   for (;;) {
@@ -209,40 +209,32 @@ void xGatekeeper(void *pvParameters) {
     vTaskDelayUntil(&xLasWakeTime, xDelay);
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Check for a message in the mic queue. Dont block!
+    // Check for a message in the mic queue
     if (xQueueReceive(mic_queue, &mic_val, 0) == pdPASS) {
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       calculate_average(MIC_SAMPLES, mic_val.mic_val, &micAverage);
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       // Convert the average to dB
       micAverageTodB = round(20.0 * log10(micAverage));
-      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      // new samples has been retrieved, print them
-      toPrintOrNotToPrint = 1;
     }
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Check for a message in the joy_queue. Dont block!
+    // Check for a message in the joy_queue
     if (xQueueReceive(joy_queue, &joy, 0) == pdPASS) {
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      // Sum the samples
       calculate_average(JOY_SAMPLES, joy.joy_x, &joyAverageX);
       calculate_average(JOY_SAMPLES, joy.joy_y, &joyAverageY);
-      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      // New values has been retrieved, Print the values
-      toPrintOrNotToPrint = 1;
     }
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Check for message in the acc_queue. Dont block
+    // Check for message in the acc_queue
     if (xQueueReceive(acc_queue, &acc, 0) == pdPASS) {
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       calculate_average(ACC_SAMPLES, acc.acc_x, &accAverageX);
       calculate_average(ACC_SAMPLES, acc.acc_y, &accAverageY);
       calculate_average(ACC_SAMPLES, acc.acc_z, &accAverageZ);
-      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      toPrintOrNotToPrint = 1;
     }
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // If new values has been retrieved we print them
+    // If any values received indicates user input we print them.
+    // i.e. they have change a greater amount than THRESHOLD.
     if ((abs_diff(micAverageold, micAverage) > THRESHOLD) ||
         abs_diff(accAverageXold, accAverageX) > THRESHOLD ||
         abs_diff(accAverageYold, accAverageY) > THRESHOLD ||
@@ -250,12 +242,14 @@ void xGatekeeper(void *pvParameters) {
         abs_diff(joyAverageXold, joyAverageX) > THRESHOLD ||
         abs_diff(joyAverageYold, joyAverageY) > THRESHOLD) {
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Print to the serial terminal
       UARTprintf("\033[2J");
       UARTprintf("MIC: %d, dB\n", micAverageTodB);
       UARTprintf("ACC: %d x, %d y, %d z\n", accAverageX, accAverageY,
                  accAverageZ);
       UARTprintf("JOY: %d x, %d y\n", joyAverageX, joyAverageY);
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Update the old values
       micAverageold = micAverage;
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       accAverageZold = accAverageZ;
@@ -292,7 +286,6 @@ int main(void) {
   mic_queue = xQueueCreate(QUEUE_SIZE, sizeof(struct microphone_values));
   joy_queue = xQueueCreate(QUEUE_SIZE, sizeof(struct joystick_values));
   acc_queue = xQueueCreate(QUEUE_SIZE, sizeof(struct accelerometer_values));
-
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   if (mic_queue != NULL && joy_queue != NULL && acc_queue != NULL) {
     UARTprintf("Queues succesfully created\n");
