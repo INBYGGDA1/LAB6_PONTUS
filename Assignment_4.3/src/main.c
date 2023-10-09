@@ -178,7 +178,7 @@ void xGatekeeper(void *pvParameters) {
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   uint32_t toPrintOrNotToPrint = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  uint32_t micAverage = 0;
+  uint32_t micAverage_ = 0;
   uint32_t micAverageTodB = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   uint32_t joyAverageX = 0;
@@ -188,7 +188,7 @@ void xGatekeeper(void *pvParameters) {
   uint32_t accAverageY = 0;
   uint32_t accAverageZ = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  uint32_t micAverageold = 0;
+  uint32_t micAverageold_ = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   uint32_t joyAverageXold = 0;
   uint32_t joyAverageYold = 0;
@@ -212,10 +212,10 @@ void xGatekeeper(void *pvParameters) {
     // Check for a message in the mic queue
     if (xQueueReceive(mic_queue, &mic_val, 0) == pdPASS) {
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      calculate_average(MIC_SAMPLES, mic_val.mic_val, &micAverage);
+      calculate_average(MIC_SAMPLES, mic_val.mic_val, &micAverage_);
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       // Convert the average to dB
-      micAverageTodB = round(20.0 * log10(micAverage));
+      micAverageTodB = round(20.0 * log10(micAverage_));
     }
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Check for a message in the joy_queue
@@ -235,7 +235,7 @@ void xGatekeeper(void *pvParameters) {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // If any values received indicates user input we print them.
     // i.e. they have change a greater amount than THRESHOLD.
-    if ((abs_diff(micAverageold, micAverage) > THRESHOLD) ||
+    if (abs_diff(micAverageold_, micAverage_) > THRESHOLD ||
         abs_diff(accAverageXold, accAverageX) > THRESHOLD ||
         abs_diff(accAverageYold, accAverageY) > THRESHOLD ||
         abs_diff(accAverageZold, accAverageZ) > THRESHOLD ||
@@ -250,7 +250,7 @@ void xGatekeeper(void *pvParameters) {
       UARTprintf("JOY: %d x, %d y\n", joyAverageX, joyAverageY);
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       // Update the old values
-      micAverageold = micAverage;
+      micAverageold_ = micAverage_;
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       accAverageZold = accAverageZ;
       accAverageYold = accAverageY;
@@ -264,8 +264,6 @@ void xGatekeeper(void *pvParameters) {
 int main(void) {
   uint32_t systemClock;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // There exist some errata with using the main oscillator and adc, hence the
-  // internal oscillator is specified instead
   ConfigureSystemClock(120000000, &systemClock);
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   TaskHandle_t xTaskMicHandle;
