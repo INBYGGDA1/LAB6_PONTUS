@@ -48,43 +48,80 @@ SemaphoreHandle_t butler_semaphore;
 void vDiningPhilosopher(void *pvParameters) {
   uint32_t philosopher_id = *(uint32_t *)pvParameters;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  uint32_t right_fork = philosopher_id;
-  uint32_t left_fork = (philosopher_id + 1) % NUMBER_OF_CHOPSTICKS;
+  // Left chopstick
+  uint32_t left_chopstick = philosopher_id;
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // right chopstick
+  uint32_t right_chopstick = (philosopher_id + 1) % NUMBER_OF_CHOPSTICKS;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t thinking_time = pdMS_TO_TICKS(1000 * (philosopher_id + 2));
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // Create some delay
+  const TickType_t thinking_time = pdMS_TO_TICKS(1000 * (philosopher_id + 1));
   const TickType_t eating_time = pdMS_TO_TICKS(1000 * (philosopher_id + 2));
   for (;;) {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Think
-    UARTprintf("(%d): Thinking time\n", philosopher_id);
+    UARTprintf("\n(%d): Thinking time\n", philosopher_id);
     vTaskDelay(thinking_time);
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Pickup chopsticks in odd and even order
+    // Even numbered philosophers will always pick up the left chopstick first.
+    // Odd numbered philosophers will always pick up the right chopstick first.
+    // This solution will always end up with atleast one philosopher dining.
     if (philosopher_id % 2 == 0) {
-      xSemaphoreTake(chopstick_semaphore[left_fork], portMAX_DELAY);
-      UARTprintf("(%d): Left chopstick picked up\n", philosopher_id);
-
-      xSemaphoreTake(chopstick_semaphore[right_fork], portMAX_DELAY);
-      UARTprintf("(%d): Right chopstick picked up\n", philosopher_id);
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Pick up left chopstick
+      xSemaphoreTake(chopstick_semaphore[left_chopstick], portMAX_DELAY);
+      vWorker(10); // Workers are here to make the output somewhat readable
+      UARTprintf("\n(%d): Left chopstick picked up\n", philosopher_id);
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // pickup right chopstick
+      xSemaphoreTake(chopstick_semaphore[right_chopstick], portMAX_DELAY);
+      vWorker(10);
+      UARTprintf("\n(%d): Right chopstick picked up\n", philosopher_id);
     } else {
-      xSemaphoreTake(chopstick_semaphore[right_fork], portMAX_DELAY);
-      UARTprintf("(%d): Left chopstick picked up\n", philosopher_id);
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // pickup right chopstick
+      xSemaphoreTake(chopstick_semaphore[right_chopstick], portMAX_DELAY);
+      vWorker(10);
+      UARTprintf("\n(%d): Left chopstick picked up\n", philosopher_id);
 
-      xSemaphoreTake(chopstick_semaphore[left_fork], portMAX_DELAY);
-      UARTprintf("(%d): Right chopstick picked up\n", philosopher_id);
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // pickup left chopstick
+      xSemaphoreTake(chopstick_semaphore[left_chopstick], portMAX_DELAY);
+      vWorker(10);
+      UARTprintf("\n(%d): Right chopstick picked up\n", philosopher_id);
     }
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Eat
-    UARTprintf("(%d): Eating time\n", philosopher_id);
+    UARTprintf("\n(%d): Eating time\n", philosopher_id);
     vTaskDelay(eating_time);
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    UARTprintf("(%d): Put down chopsticks\n", philosopher_id);
-    xSemaphoreGive(chopstick_semaphore[left_fork]);
 
-    xSemaphoreGive(chopstick_semaphore[right_fork]);
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Put down the chopsticks
+    if (philosopher_id % 2 == 0) {
+
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      UARTprintf("\n(%d): Put down left chopstick\n", philosopher_id);
+      xSemaphoreGive(chopstick_semaphore[left_chopstick]);
+      vWorker(10);
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      UARTprintf("\n(%d): Put down right chopstick\n", philosopher_id);
+      xSemaphoreGive(chopstick_semaphore[right_chopstick]);
+      vWorker(10);
+    } else {
+
+      UARTprintf("\n(%d): Put down right chopstick\n", philosopher_id);
+      xSemaphoreGive(chopstick_semaphore[right_chopstick]);
+      vWorker(10);
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      UARTprintf("\n(%d): Put down left chopstick\n", philosopher_id);
+      xSemaphoreGive(chopstick_semaphore[left_chopstick]);
+      vWorker(10);
+    }
+    vWorker(2000);
   }
   vPortFree(&philosopher_id);
 }
