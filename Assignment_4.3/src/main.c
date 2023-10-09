@@ -46,7 +46,8 @@
 #define MIC_SAMPLES 8
 #define JOY_SAMPLES 4
 #define ACC_SAMPLES 2
-#define QUEUE_SIZE 10
+#define QUEUE_SIZE 2 // If the queue size if to big, the output is delayed
+#define THRESHOLD 15
 
 //=============================================================================
 QueueHandle_t mic_queue;
@@ -94,8 +95,7 @@ void task_mic(void *pvParameters) {
     sampleData(ADC0_BASE, 0, ADC_CTL_CH8, MIC_SAMPLES, &samplesReturned,
                mic_val.mic_val, 0);
     if (samplesReturned == MIC_SAMPLES) {
-      while (xQueueSend(mic_queue, &mic_val, portMAX_DELAY) != pdTRUE) {
-      }
+      xQueueSend(mic_queue, &mic_val, portMAX_DELAY);
     }
   }
 }
@@ -127,9 +127,8 @@ void task_joy(void *pvParameters) {
     sampleData(ADC0_BASE, 1, ADC_CTL_CH0, JOY_SAMPLES, &samplesReturned,
                joy.joy_y, 1);
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    if (samplesReturned == 8) {
-      while (xQueueSend(joy_queue, &joy, portMAX_DELAY) != pdTRUE) {
-      }
+    if (samplesReturned == 2 * JOY_SAMPLES) {
+      xQueueSend(joy_queue, &joy, portMAX_DELAY);
     }
   }
 }
@@ -164,8 +163,7 @@ void task_acc(void *pvParameters) {
                acc.acc_z, 1);
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (samplesReturned == ACC_SAMPLES * 3) {
-      while (xQueueSend(acc_queue, &acc, portMAX_DELAY) != pdTRUE) {
-      }
+      xQueueSend(acc_queue, &acc, portMAX_DELAY);
     }
   }
 }
@@ -176,7 +174,9 @@ void task_acc(void *pvParameters) {
 //=============================================================================
 void xGatekeeper(void *pvParameters) {
   const int T = 8;
-  int i = 0;
+  uint32_t i = 0;
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  uint32_t toPrintOrNotToPrint = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   uint32_t micAverage = 0;
   uint32_t micAverageTodB = 0;
@@ -188,13 +188,20 @@ void xGatekeeper(void *pvParameters) {
   uint32_t accAverageY = 0;
   uint32_t accAverageZ = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  uint32_t toPrintOrNotToPrint = 0;
+  uint32_t micAverageold = 0;
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  uint32_t joyAverageXold = 0;
+  uint32_t joyAverageYold = 0;
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  uint32_t accAverageXold = 0;
+  uint32_t accAverageYold = 0;
+  uint32_t accAverageZold = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   struct joystick_values joy;
   struct accelerometer_values acc;
   struct microphone_values mic_val;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  const TickType_t xDelay = pdMS_TO_TICKS(5 * T);
+  const TickType_t xDelay = pdMS_TO_TICKS(WAIT_TIME * T);
   TickType_t xLasWakeTime = xTaskGetTickCount();
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   for (;;) {
@@ -236,13 +243,27 @@ void xGatekeeper(void *pvParameters) {
     }
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // If new values has been retrieved we print them
-    if (toPrintOrNotToPrint) {
+    if ((abs_diff(micAverageold, micAverage) > THRESHOLD) ||
+        abs_diff(accAverageXold, accAverageX) > THRESHOLD ||
+        abs_diff(accAverageYold, accAverageY) > THRESHOLD ||
+        abs_diff(accAverageZold, accAverageZ) > THRESHOLD ||
+        abs_diff(joyAverageXold, joyAverageX) > THRESHOLD ||
+        abs_diff(joyAverageYold, joyAverageY) > THRESHOLD) {
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       UARTprintf("\033[2J");
       UARTprintf("MIC: %d, dB\n", micAverageTodB);
       UARTprintf("ACC: %d x, %d y, %d z\n", accAverageX, accAverageY,
                  accAverageZ);
       UARTprintf("JOY: %d x, %d y\n", joyAverageX, joyAverageY);
-      toPrintOrNotToPrint = 0;
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      micAverageold = micAverage;
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      accAverageZold = accAverageZ;
+      accAverageYold = accAverageY;
+      accAverageXold = accAverageX;
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      joyAverageYold = joyAverageY;
+      joyAverageXold = joyAverageX;
     }
   }
 }
@@ -287,7 +308,7 @@ int main(void) {
       xTaskCreate(task_joy, "Joy", 128, NULL, 3, &xTaskJoyHandle);
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   xGatekeerperHandleReturn =
-      xTaskCreate(xGatekeeper, "GP", 128, NULL, 2, &xGatekeerperHandle);
+      xTaskCreate(xGatekeeper, "GP", 128, NULL, 3, &xGatekeerperHandle);
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   if (xTaskMicHandleReturn != pdFALSE && xTaskJoyHandleReturn != pdFALSE &&
       xTaskAccHandleReturn != pdFALSE && xGatekeerperHandleReturn != pdFALSE) {
