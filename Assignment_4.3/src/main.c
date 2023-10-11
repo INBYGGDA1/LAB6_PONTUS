@@ -105,7 +105,6 @@ void task_mic(void *pvParameters) {
 //=============================================================================
 void task_joy(void *pvParameters) {
   const int T = 2;
-  uint32_t i = 0;
   uint32_t samplesReturned = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   struct joystick_values joy;
@@ -139,7 +138,6 @@ void task_joy(void *pvParameters) {
 //=============================================================================
 void task_acc(void *pvParameters) {
   const int T = 4;
-  int i = 0;
   uint32_t samplesReturned = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   struct accelerometer_values acc;
