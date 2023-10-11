@@ -174,9 +174,6 @@ void task_acc(void *pvParameters) {
 //=============================================================================
 void xGatekeeper(void *pvParameters) {
   const int T = 8;
-  uint32_t i = 0;
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  uint32_t toPrintOrNotToPrint = 0;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   uint32_t micAverage_ = 0;
   uint32_t micAverageTodB = 0;
