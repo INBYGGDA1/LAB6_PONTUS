@@ -12,21 +12,15 @@
  */
 
 //=============================================================================
-#include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include "time.h"
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#include "driverlib/sysctl.h"
-#include "driverlib/adc.h"
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #include "tm4c129_functions.h"
 #include "tm4c129_rtos.h"
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #include "utils/uartstdio.h"
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#include "inc/hw_memmap.h"
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #include "FreeRTOS.h"
 #include "FreeRTOSConfig.h"
@@ -153,11 +147,11 @@ int main(void) {
   randomConsumer = rand() % 10 + 1;
   randomProducer = rand() % 10 + 1;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  TaskHandle_t xProducerHandle[randomProducer];
-  TaskHandle_t xConsumerHandle[randomConsumer];
+  TaskHandle_t xProducerHandle;
+  TaskHandle_t xConsumerHandle;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  BaseType_t xProducerReturn[randomProducer];
-  BaseType_t xConsumerReturn[randomConsumer];
+  BaseType_t xProducerReturn;
+  BaseType_t xConsumerReturn;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ConfigureUART();
   UARTClearScreen();
@@ -166,19 +160,19 @@ int main(void) {
   // Create a random amount of producers and consumers
   for (i = 0; i < randomProducer; i++) {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    xProducerReturn[i] =
-        xTaskCreate(producer, "producer", 64, NULL, 1, &xProducerHandle[i]);
+    xProducerReturn =
+        xTaskCreate(producer, "producer", 64, NULL, 1, &xProducerHandle);
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    if (xProducerReturn[i] != pdPASS) {
+    if (xProducerReturn != pdPASS) {
       UARTprintf("Unable to create produces task\n");
     }
   }
   for (i = 0; i < randomConsumer; i++) {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    xConsumerReturn[i] =
-        xTaskCreate(consumer, "consumer", 64, NULL, 1, &xConsumerHandle[i]);
+    xConsumerReturn =
+        xTaskCreate(consumer, "consumer", 64, NULL, 1, &xConsumerHandle);
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    if (xConsumerReturn[i] != pdPASS) {
+    if (xConsumerReturn != pdPASS) {
       UARTprintf("Unable to create consumer task\n");
     }
   }
