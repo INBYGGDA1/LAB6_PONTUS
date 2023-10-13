@@ -33,6 +33,8 @@
 
 /*================================================================*/
 #include "inc/hw_memmap.h"
+/*================================================================*/
+#include "tm4c129_functions.h"
 
 /*================================================================*/
 #include "FreeRTOS.h"
@@ -43,84 +45,63 @@
 #include "task.h"
 #include "queue.h"
 
-#define STRING_LENGTH 16 // 15 characters + \0
-/*================================================================*/
-#ifdef DEBUG
-void __error__(char *pcFilename, uint32_t ui32Line) {
-  while (1)
-    ;
-}
-#endif
-
-/*================================================================*/
-/*            Helper function configure uart                      */
-/*================================================================*/
-void ConfigureUART() {
-  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-  SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
-  GPIOPinConfigure(GPIO_PA0_U0RX);
-  GPIOPinConfigure(GPIO_PA1_U0TX);
-  GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-  UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
-  UARTStdioConfig(0, 115200, 16000000);
-}
+#define STRING_LENGTH 15 // 15 characters + \0
 /*================================================================*/
 void uartPrinter(void *pvParameters) {
-  char input[128] = {0};
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   char strHolder[128] = {0};
   char strToPrint[STRING_LENGTH] = {0};
-  int bytesRead = 0, i = 0;
-  int total_number_of_bytes = 0, current_str_length = 0, strShift = 0;
+  char c;
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  int i = 0;
+  int total_number_of_bytes = 0, current_str_length = 0;
 
   for (;;) {
-    UARTprintf("Input: ");
-    bytesRead = UARTgets(input, sizeof(input)); // bytesRead does not include \0
-    for (i = 0; i < 128; i++) {                 // Reset the array
-      strHolder[i] = 0;
-    }
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ResetString(strHolder, 128);
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // UARTprintf("Input: ");
+    while (UARTCharsAvail(UART0_BASE)) {
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      UARTClearScreen();
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      c = UARTCharGet(UART0_BASE);
+      total_number_of_bytes++; // After receiving a char we increase the bytes
 
-    total_number_of_bytes = bytesRead + strlen(strToPrint); // excluding \0
-    strShift =
-        total_number_of_bytes -
-        STRING_LENGTH; // If the value is positive we need to shift the string
-    for (i = 0; i < strlen(strToPrint);
-         i++) { // Copy previous string to a temp array
-      strHolder[i] = strToPrint[i];
-    }
-    strHolder[i] = '\0';
-    current_str_length =
-        strlen(strHolder); // Append the input string to the previous string
-    for (i = 0; i < bytesRead; i++) {
-      strHolder[current_str_length] = input[i];
-      current_str_length++;
-    }
-    strHolder[current_str_length + i] = '\0';
-
-    if (total_number_of_bytes >=
-        STRING_LENGTH) { // If the string is greater than STRING_LENGTH we need
-                         // to shift it
-
-      while (strShift >= 0) { // strShift == 0 is one shift since the \0 is
-                              // included in the STRING_LENGTH
-
-        for (i = 0; i < strlen(strHolder);
-             i++) { // Shift all characters to the left
-          strHolder[i] = strHolder[i + 1];
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // If the total_number_of_bytes is greater than STRING_LENGTH we need to
+      // shift the string
+      if (total_number_of_bytes > STRING_LENGTH) {
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Shift by one character
+        for (i = 0; i < strlen(strToPrint);
+             i++) { // Copy previous string to a temp array
+          strHolder[i] = strToPrint[i];
         }
-        strHolder[i] = '\0';
-        strShift--;
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Append the latest character.
+        strHolder[i] = c;
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Reset the printed string to avoid printing any characters which
+        // should not be present
+        ResetString(strToPrint, STRING_LENGTH);
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Shift the string, We only need to shift once since it is the first
+        // character
+        for (i = 0; i < STRING_LENGTH; i++) {
+          strToPrint[i] = strHolder[i + 1];
+        }
+      } else {
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // We just append the character
+        strToPrint[total_number_of_bytes - 1] = c;
       }
-      for (i = 0; i < strlen(strHolder); i++) { // Copy to the str to be printed
-        strToPrint[i] = strHolder[i];
-      }
-      strToPrint[i] = '\0';
-    } else {
-      for (i = 0; i < strlen(strHolder); i++) {
-        strToPrint[i] = strHolder[i];
-      }
-      strToPrint[i] = '\0';
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Specify the null terminator to be the end of the string
+      strToPrint[total_number_of_bytes] = '\0';
+      UARTprintf("%s", strToPrint);
     }
-    UARTprintf("%s\n", strToPrint);
   }
 }
 
@@ -129,7 +110,7 @@ int main(void) {
   TaskHandle_t xUartPrinterHandle;
   BaseType_t xUartPrinterReturn;
   ConfigureUART();
-  UARTprintf("\033[2J");
+  UARTClearScreen();
   xUartPrinterReturn = xTaskCreate(uartPrinter, "Print serial", 128, NULL, 1,
                                    &xUartPrinterHandle);
   if (xUartPrinterReturn != pdFALSE) {

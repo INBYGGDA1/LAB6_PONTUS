@@ -123,7 +123,6 @@ void vDiningPhilosopher(void *pvParameters) {
     }
     vWorker(2000);
   }
-  vPortFree(&philosopher_id);
 }
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 int main(void) {

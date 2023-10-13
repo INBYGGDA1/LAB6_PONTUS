@@ -57,15 +57,18 @@ void producer(void *pvParameters) {
 
     char byte = produceByte();
     // semphr
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (bufferIndex == BUFFER_SIZE) {
       // semphr unlock
       UARTprintf("P: BUFFER FULL: SLEEPING\n");
       vTaskSuspend(NULL);
     }
     UARTprintf("P: PLACING Byte in Buffer: IDX[%d]\n", bufferIndex);
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // semaphore here
     byteCount[bufferIndex] = byte;
     bufferIndex++;
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (bufferIndex == 1) {
       UARTprintf("P: BUFFER is not EMPTY, WAKING CONSUMER\n");
       // Wake consumer
@@ -88,6 +91,7 @@ void consumer(void *pvParameters) {
     UARTprintf("C: Removing byte from buffer: IDX[%d]\n", bufferIndex);
     // semaphore
     removeByteFromBuffer();
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (bufferIndex == BUFFER_SIZE - 1) {
       // Wake producer
       UARTprintf("C: Waking up producer\n");
@@ -102,12 +106,15 @@ int main(void) {
   BaseType_t xProducerReturn;
   BaseType_t xConsumerReturn;
   ConfigureUART();
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   UARTprintf("\033[2J");
 
   xProducerReturn = xTaskCreate(producer, "producer", 128,
                                 (void *)&xConsumerHandle, 1, &xProducerHandle);
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   xConsumerReturn = xTaskCreate(consumer, "consumer", 128,
                                 (void *)&xProducerHandle, 1, &xConsumerHandle);
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   if (xProducerReturn == pdPASS && xConsumerReturn == pdPASS) {
     UARTprintf("Producer & Consumer Tasks created\n");
   }

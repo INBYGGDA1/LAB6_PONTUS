@@ -240,9 +240,9 @@ void xGatekeeper(void *pvParameters) {
       // Print to the serial terminal
       UARTprintf("\033[2J");
       UARTprintf("MIC: %d, dB\n", micAverageTodB);
+      UARTprintf("JOY: %d x, %d y\n", joyAverageX, joyAverageY);
       UARTprintf("ACC: %d x, %d y, %d z\n", accAverageX, accAverageY,
                  accAverageZ);
-      UARTprintf("JOY: %d x, %d y\n", joyAverageX, joyAverageY);
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       // Update the old values
       micAverageold_ = micAverage_;
