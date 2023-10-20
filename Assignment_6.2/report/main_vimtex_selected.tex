@@ -1,0 +1,59 @@
+\documentclass[conference]{IEEEtran}
+% Include all packages from file.
+% Report template for Mälardalen University
+% Original template can be found: 
+% https://www.overleaf.com/latex/templates/ieee-bare-demo-template-for-conferences/ypypvwjmvtdf
+% Template file structure organised by: Emil Persson
+% The following packages should follow the IEEE conference guidelines.
+
+% Swedish language package 
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[swedish,english]{babel}
+
+% Graphics
+\usepackage{graphicx, float, subfigure, blindtext}
+
+\newcommand\IEEEhyperrefsetup{
+bookmarks=true,bookmarksnumbered=true,%
+colorlinks=true,linkcolor={black},citecolor={black},urlcolor={black}%
+}
+
+% Preferred hyperref setup, Michael Shell
+\usepackage[\IEEEhyperrefsetup, pdftex]{hyperref}
+
+% Maths
+\usepackage{mathtools}
+
+% These packages must be at the end
+\usepackage[nolist,nohyperlinks]{acronym}
+\usepackage{cleveref}
+\graphicspath{{images/}}
+% Include acronyms
+% \acrodef{acronym}[short name]{full name}
+\acrodef{IC}[IC]{Integrated Circuit}
+% \acrodef{svm}[SVM]{Support Vector Machine}
+\newacro{svm}[SVM]{Support Vector Machine}
+% Example use \ac{IC} for printing "Integrated Circuit (IC), use \ac{IC} again and it will print (IC)"
+% For plural use \acp{IC} for short and \aclp{IC} for long.
+% For more see: http://ftp.acc.umu.se/mirror/CTAN/macros/latex/contrib/acronym/acronym.pdf
+% Include authors 
+\author{\IEEEauthorblockN{
+Carl Larsson\IEEEauthorrefmark{1},
+Pontus Svensson\IEEEauthorrefmark{2},
+}
+
+\IEEEauthorblockA{
+School of Innovation, Design and Engineering, M.Sc.Eng Robotics\\
+Mälardalens University, Västerås, Sweden\\
+Email:
+cln20001@student.mdu.se\IEEEauthorrefmark{1}, psn19003@student.mdu.se\IEEEauthorrefmark{2}}
+}
+% The report title.
+\title{IEEEtran reports template\\
+Mälardalen University - M.Sc.Eng Robotics Reports}
+% Document begins here
+\begin{document}
+%
+
+\end{document}

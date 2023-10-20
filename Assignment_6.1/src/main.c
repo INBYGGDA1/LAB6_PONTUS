@@ -59,6 +59,7 @@ void vDiningPhilosopher(void *pvParameters) {
   // Create some delay
   const TickType_t thinking_time = pdMS_TO_TICKS(1000 * (philosopher_id + 1));
   const TickType_t eating_time = pdMS_TO_TICKS(1000 * (philosopher_id + 2));
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   for (;;) {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Think
@@ -71,7 +72,10 @@ void vDiningPhilosopher(void *pvParameters) {
     // This solution will always end up with atleast one philosopher dining.
     if (philosopher_id % 2 == 0) {
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Even
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       // Pick up left chopstick
+      // If we cant pick it up we will wait here until it is available
       xSemaphoreTake(chopstick_semaphore[left_chopstick], portMAX_DELAY);
       vWorker(10); // Workers are here to make the output somewhat readable
       UARTprintf("\n(%d): Left chopstick picked up\n", philosopher_id);
@@ -81,6 +85,8 @@ void vDiningPhilosopher(void *pvParameters) {
       vWorker(10);
       UARTprintf("\n(%d): Right chopstick picked up\n", philosopher_id);
     } else {
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Odd
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       // pickup right chopstick
       xSemaphoreTake(chopstick_semaphore[right_chopstick], portMAX_DELAY);
@@ -137,6 +143,7 @@ int main(void) {
   ConfigureUART();
   UARTClearScreen();
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // Create the philosopher task
   for (i = 0; i < NUMBER_OF_PHILOSOPHERS; i++) {
     philosopher_id = pvPortMalloc(sizeof(uint32_t));
     *philosopher_id = i;
@@ -149,6 +156,8 @@ int main(void) {
       UARTprintf("Unable to create task\n");
     }
   }
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // Create the mutexes for each chopstick
   for (i = 0; i < NUMBER_OF_PHILOSOPHERS; i++) {
 
     chopstick_semaphore[i] = xSemaphoreCreateMutex();

@@ -4,7 +4,7 @@
  * Author: Pontus Svensson
  * Email: psn19003@student.mdu.se
  * Date: 2023-10-09
- * Description: Dining phhilosophers
+ * Description: Random number of producers and consumer.
  *
  * License: This code is distributed under the MIT License. visit
  * https://opensource.org/licenses/MIT for more information.
@@ -32,105 +32,150 @@
 #include "queue.h"
 #include "portable.h"
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #define BUFFER_SIZE 2
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 volatile char byteCount[BUFFER_SIZE];
 volatile int bufferIndex = 0;
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 SemaphoreHandle_t xSemaphoreCountingFULL, xSemaphoreCountingEmpty,
     xSemaphoreBinary;
 /*================================================================*/
 void produceByte() {
-  char byte = 'c'; // Place 1 as the byte
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  char byte = 'c'; // Place c as the byte
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   if (bufferIndex < BUFFER_SIZE) {
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     byteCount[bufferIndex] = byte;
     bufferIndex++;
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   }
 }
 
 /*================================================================*/
 void removeByteFromBuffer() {
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   if (bufferIndex > 0) {
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     byteCount[bufferIndex] = '\0';
     bufferIndex--;
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   }
 }
 /*================================================================*/
 void producer(void *pvParameters) {
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  int i = *(int *)pvParameters;
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xDelay = pdMS_TO_TICKS(200); // 200 ms delay
+  const TickType_t xDelay = pdMS_TO_TICKS(200);
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   while (1) {
-
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     vTaskDelay(xDelay); // Delay for 200 ms
-
-    UARTprintf("+ PRODUCER --> TAKE SemEmpty: Empty-Count (%d)\n",
-               uxSemaphoreGetCount(xSemaphoreCountingEmpty));
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Take the empty semaphore as soon as there is an available slot, otherwise
     // wait here
     if (xSemaphoreTake(xSemaphoreCountingEmpty, (TickType_t)portMAX_DELAY) ==
         pdTRUE) {
 
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      UARTprintf("\n+ P(%d)--> TAKE SemEmpty: Empty-Count (%d)\n", i,
+                 uxSemaphoreGetCount(xSemaphoreCountingEmpty));
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       // CRITICAL SECTION
-      UARTprintf("+ PRODUCER --> TAKE BINARY, VALUE (%d)\n",
-                 uxSemaphoreGetCount(xSemaphoreBinary));
+      // Take the binary semaphore to ensure mutual exclusion
+      // when writing to the buffer.
       if (xSemaphoreTake(xSemaphoreBinary, (TickType_t)portMAX_DELAY) ==
-          pdFALSE) { // Take the binary semaphore to ensure mutual exclusion
-                     // when writing to the buffer.
-        UARTprintf("+ PRODUCER --> Error taking xSemaphoreBinary\n");
+          pdFALSE) { // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n+ P(%d)--> Error taking xSemaphoreBinary\n", i);
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       } else {
-
-        UARTprintf("+ PRODUCER --> Producing byte, Position (%d)\n",
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n+ P(%d)--> TAKE BINARY, VALUE (%d)\n", i,
+                   uxSemaphoreGetCount(xSemaphoreBinary));
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n+ P(%d)--> Producing byte, Position (%d)\n", i,
                    bufferIndex);
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         produceByte();
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Give the binary semaphore
         while (xSemaphoreGive(xSemaphoreBinary) != pdTRUE)
           ;
         // End CRITICAL SECTION
 
-        UARTprintf("+ PRODUCER --> GIVE BINARY, Updated VALUE (%d)\n",
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n+ P(%d)--> GIVE BINARY, Updated VALUE (%d)\n", i,
                    uxSemaphoreGetCount(xSemaphoreBinary));
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Decrease available spots
         while (xSemaphoreGive(xSemaphoreCountingFULL) != pdTRUE)
-          ; // Decrease available spots
-
-        UARTprintf("+ PRODUCER --> GIVE SemFull, Updated Full-Count (%d)\n",
+          ;
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n+ P(%d)--> GIVE SemFull, Updated Full-Count (%d)\n", i,
                    uxSemaphoreGetCount(xSemaphoreCountingFULL));
       }
     }
   }
 }
+/*================================================================*/
 void consumer(void *pvParameters) {
-
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  int i = *(int *)pvParameters;
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xDelay = pdMS_TO_TICKS(400); // 400 msecond delay
+  const TickType_t xDelay = pdMS_TO_TICKS(200);
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   while (1) {
-
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     vTaskDelay(xDelay);
-
-    UARTprintf("- CONSUMER --> TAKE SemFull, Full-Count (%d)\n",
-               uxSemaphoreGetCount(xSemaphoreCountingFULL));
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Increase the counting semaphore that keeps track of the current items in
+    // the buffer
     if (xSemaphoreTake(xSemaphoreCountingFULL, (TickType_t)portMAX_DELAY) ==
-        pdTRUE) { // If the xSemaphoreCountingFULL counter is > 0, we have bytes
-                  // to consume. Otherwise wait here until we have bytes to
-                  // consume
-      UARTprintf("- CONSUMER --> TAKE BINARY, VALUE (%d)\n",
-                 uxSemaphoreGetCount(xSemaphoreBinary));
+        pdTRUE) {
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      UARTprintf("\n- C(%d)--> TAKE SemFull, Full-Count (%d)\n", i,
+                 uxSemaphoreGetCount(xSemaphoreCountingFULL));
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Take the binary semaphore to ensure mutual exclusion before writing to
+      // the buffer
       if (xSemaphoreTake(xSemaphoreBinary, (TickType_t)portMAX_DELAY) ==
-          pdFALSE) { // Take the binary semaphore to ensure mutual exclusion
-                     // when writing to the buffer.
-        UARTprintf("- CONSUMER --> Error taking xSemaphoreBinary\n");
+          pdFALSE) {
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n- C(%d)--> Error taking xSemaphoreBinary\n", i);
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       } else {
-
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n- C(%d)--> TAKE BINARY, VALUE (%d)\n", i,
+                   uxSemaphoreGetCount(xSemaphoreBinary));
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // CRITICAL SECTION
-        UARTprintf("- CONSUMER --> Removing byte, Position (%d)\n",
+        UARTprintf("\n- C(%d)--> Removing byte, Position (%d)\n", i,
                    bufferIndex);
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         removeByteFromBuffer();
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Release the binary semaphore to allow other tasks to produce or
+        // consume bytes
         while (xSemaphoreGive(xSemaphoreBinary) != pdTRUE)
           ;
-        UARTprintf("- CONSUMER --> GIVE BINARY, Updated VALUE (%d)\n",
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n- C(%d)--> GIVE BINARY, Updated VALUE (%d)\n", i,
                    uxSemaphoreGetCount(xSemaphoreBinary));
         // END CRITICAL SECTION
 
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Increase one slot in the semaphore that keeps track of the available
+        // slots in the buffer since we just consumed one byte
         while (xSemaphoreGive(xSemaphoreCountingEmpty) != pdTRUE)
           ;
-        UARTprintf("- CONSUMER --> GIVE SemEmpty, Updated Empty-Count (%d)\n",
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        UARTprintf("\n- C(%d)--> GIVE SemEmpty, Updated Empty-Count (%d)\n", i,
                    uxSemaphoreGetCount(xSemaphoreCountingEmpty));
       }
     }
@@ -144,8 +189,8 @@ int main(void) {
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   srand(time(NULL));
   // no more than 20 tasks
-  randomConsumer = rand() % 10 + 1;
-  randomProducer = rand() % 10 + 1;
+  randomConsumer = rand() % 9 + 1;
+  randomProducer = rand() % 9 + 1;
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   TaskHandle_t xProducerHandle;
   TaskHandle_t xConsumerHandle;
@@ -155,22 +200,30 @@ int main(void) {
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ConfigureUART();
   UARTClearScreen();
-
+  UARTprintf("Consumers: %d\nProducers: %d\n", randomConsumer, randomProducer);
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // Create a random amount of producers and consumers
   for (i = 0; i < randomProducer; i++) {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // To allow the ids of the tasks to be printed
+    int *k = pvPortMalloc(sizeof(int));
+    *k = i;
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     xProducerReturn =
-        xTaskCreate(producer, "producer", 64, NULL, 1, &xProducerHandle);
+        xTaskCreate(producer, "producer", 64, k, 1, &xProducerHandle);
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (xProducerReturn != pdPASS) {
       UARTprintf("Unable to create produces task\n");
     }
   }
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   for (i = 0; i < randomConsumer; i++) {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    int *k = pvPortMalloc(sizeof(int));
+    *k = i;
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     xConsumerReturn =
-        xTaskCreate(consumer, "consumer", 64, NULL, 1, &xConsumerHandle);
+        xTaskCreate(consumer, "consumer", 64, k, 1, &xConsumerHandle);
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (xConsumerReturn != pdPASS) {
       UARTprintf("Unable to create consumer task\n");

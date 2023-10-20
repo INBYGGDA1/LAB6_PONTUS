@@ -1,0 +1,33 @@
+\section{Results}
+\label{section:results}
+\subsection{Initial fix for the producers / consumer problem using semaphores}
+% Initial problems, and how they were solved
+The initial problems that occurred was deadlock and race conditions. 
+The race conditions was fixed by introducing a binary semaphore which the producer / consumer tries to take whenever it should write something to the buffer. This ensures that no producer / consumer can read or write to the buffer if another producer / consumer already acquired the binary semaphore and thus no values can be overwritten or read when it is not supposed to.
+
+% Deadlock avoidance, producer example
+Deadlock avoidance was achieved by introducing two counting semaphores. \ac{sem1} and \ac{sem2}. Whenever the producer / consumer task is executing, they will take or give the corresponding semaphore, either \ac{sem1} or \ac{sem2}. If the producer cannot take \ac{sem1}. Then the producer will wait until a consumer has increased the value of \ac{sem1}.
+
+% Consumer example for deadlock avoidance
+The same works for the consumer, but it tries to take \ac{sem2}. If the consumer can take \ac{sem2}, then the count for \ac{sem2} will decrease by 1 indicating that it is going to remove one byte from the shared buffer. After the consumer has removed the byte, it will give \ac{sem1}, increasing the value of the count by 1. 
+
+\subsection{Newly introduced problems with using a random amount of producers and consumers}
+After creating a random amount of producers and consumers, the program executed like it had previously done. No indications of race conditions or deadlocks could be found. 
+% Issues found
+The issues that could be determined are, fairness of execution time, debugging complexity, and resource management.
+
+
+% Fairness
+Fairness includes the execution time for each of the producers / consumers, more explicit is that the execution time could not be established for each of the tasks, and some tasks could get more execution time and others less. I.e. the scheduling of these task was not set such that each got the same amount of execution time. This is not a problem causing any noticeable errors for this assignment, but for larger programs optimization of the scheduling is needed. 
+
+% Debugging complexity
+When trying to debug the program, the randomly introduced producers / consumers makes the program behave differently each run, making any errors occurring difficult to reproduce and thus increasing the complexity.
+
+
+% Resource management
+%With the increased number of producers and consumers the usage of the heap and stack will is increased, making the memory allocation another important aspect to consider when optimizing for the problem.
+
+\subsection{Describe how the producer / consumer problems are fixed, with a random amount of producers / consumers}
+% Conclusion
+The issues found in the program does not make the program throw any errors and still works as intended, and with the suggested optimizations the complexity of the program increases, and thus it is deemed not necessary to fix for this assignment.
+
